@@ -1,7 +1,7 @@
 # Enterprise Data Platform — Complete Technical Guide
 ## Understanding, Explaining & Presenting Your Project
 
-> **Audience:** You — a student who needs to understand every layer of this system so you can explain it confidently to a lecturer.
+> **Audience:** You — a student who needs to understand every layer of this system so you can explain it confidently.
 > **Tone:** Plain English first, then technical terms, then how to say it out loud.
 
 ---
@@ -24,7 +24,7 @@
    - 4.10 [Monitoring (pgAdmin)](#410-monitoring-pgadmin)
 5. [Key Database Concepts Explained Simply](#5-key-database-concepts-explained-simply)
 6. [Live Demo Script — Step-by-Step Commands](#6-live-demo-script)
-7. [Anticipated Lecturer Questions & Model Answers](#7-anticipated-questions--answers)
+7. [Anticipated Questions & Model Answers](#7-anticipated-questions--answers)
 8. [ER Diagram — OLTP Schema](#8-er-diagram--oltp-schema)
 9. [Star Schema Diagram — Data Warehouse](#9-star-schema-diagram)
 10. [What Makes This "Enterprise Grade"](#10-what-makes-this-enterprise-grade)
@@ -264,7 +264,7 @@ audit_log
 - **Roles** — `app_user`, `readonly_user`, `etl_reader` with least-privilege permissions
 - **Views** — `vw_active_loans`, `vw_customer_payment_summary` for common queries
 
-#### How to show the lecturer:
+#### How to show above:
 ```bash
 docker exec eds_postgres_primary psql -U postgres -d loans_db -c "\dn"          # list schemas
 docker exec eds_postgres_primary psql -U postgres -d loans_db -c "\dt operational.*"  # list tables
@@ -438,7 +438,7 @@ In the warehouse, we use a **surrogate key** (`customer_sk`) instead of the natu
 - Integer joins are faster than string joins
 - Decouples warehouse from source system changes
 
-#### Show analytical views to lecturer:
+#### Show analytical views:
 ```bash
 # Monthly revenue trend
 docker exec eds_warehouse_db psql -U warehouse_user -d warehouse_db -c \
@@ -832,7 +832,7 @@ The **Write-Ahead Log** — PostgreSQL writes every change to this log BEFORE ap
 
 ## 6. Live Demo Script
 
-Use this to demonstrate the system to your lecturer step by step.
+Use this to demonstrate the system step by step.
 
 ### Step 1: Show all running services
 ```bash
