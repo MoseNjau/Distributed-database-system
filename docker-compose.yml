@@ -1,0 +1,335 @@
+# =============================================================
+# Enterprise Data Platform — Docker Compose Orchestration
+# Production-Grade: Replication, Warehouse, ETL, OLAP, Monitoring
+# =============================================================
+
+# ─────────────────────────────────────────────────────────────
+# NAMED VOLUMES — persistent storage across container restarts
+# ─────────────────────────────────────────────────────────────
+volumes:
+  primary_data:
+    name: eds_primary_data
+  replica1_data:
+    name: eds_replica1_data
+  replica2_data:
+    name: eds_replica2_data
+  warehouse_data:
+    name: eds_warehouse_data
+  wal_archive:
+    name: eds_wal_archive
+  backups:
+    name: eds_backups
+  pgadmin_data:
+    name: eds_pgadmin_data
+  pgbouncer_data:
+    name: eds_pgbouncer_data
+
+# ─────────────────────────────────────────────────────────────
+# NETWORKS — segmented for security and isolation
+# ─────────────────────────────────────────────────────────────
+networks:
+  backend-network:
+    name: eds_backend
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+  analytics-network:
+    name: eds_analytics
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+  monitoring-network:
+    name: eds_monitoring
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+
+# ─────────────────────────────────────────────────────────────
+# SERVICES
+# ─────────────────────────────────────────────────────────────
+services:
+
+  # ===========================================================
+  # PRIMARY PostgreSQL 15 — OLTP Write Master
+  # ===========================================================
+  postgres-primary:
+    image: postgres:15
+    container_name: eds_postgres_primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: /var/lib/postgresql/data
+    env_file:
+      - .env
+    volumes:
+      - primary_data:/var/lib/postgresql/data
+      - wal_archive:/archive
+      - ./operational-db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./operational-db/seed_data.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./operational-db/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./operational-db/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - ./operational-db/setup-replication.sh:/docker-entrypoint-initdb.d/03-replication.sh:ro
+    command: >
+      postgres
+        -c config_file=/etc/postgresql/postgresql.conf
+        -c hba_file=/etc/postgresql/pg_hba.conf
+    ports:
+      - "5440:5432"
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.10
+      monitoring-network:
+        ipv4_address: 172.22.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ===========================================================
+  # REPLICA 1 — Streaming Read Replica
+  # ===========================================================
+  postgres-replica-1:
+    image: postgres:15
+    container_name: eds_postgres_replica1
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: postgres-primary
+      PRIMARY_PORT: 5432
+      REPLICATION_USER: ${REPLICATION_USER}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+      REPLICATION_SLOT: replica1_slot
+    env_file:
+      - .env
+    volumes:
+      - replica1_data:/var/lib/postgresql/data
+      - wal_archive:/archive:ro
+      - ./replica/setup-replica.sh:/setup-replica.sh:ro
+    entrypoint: ["/bin/bash", "/setup-replica.sh"]
+    ports:
+      - "5441:5432"
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.11
+      monitoring-network:
+        ipv4_address: 172.22.0.11
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ===========================================================
+  # REPLICA 2 — Streaming Read Replica
+  # ===========================================================
+  postgres-replica-2:
+    image: postgres:15
+    container_name: eds_postgres_replica2
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      PGDATA: /var/lib/postgresql/data
+      PRIMARY_HOST: postgres-primary
+      PRIMARY_PORT: 5432
+      REPLICATION_USER: ${REPLICATION_USER}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+      REPLICATION_SLOT: replica2_slot
+    env_file:
+      - .env
+    volumes:
+      - replica2_data:/var/lib/postgresql/data
+      - wal_archive:/archive:ro
+      - ./replica/setup-replica.sh:/setup-replica.sh:ro
+    entrypoint: ["/bin/bash", "/setup-replica.sh"]
+    ports:
+      - "5442:5432"
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.12
+      monitoring-network:
+        ipv4_address: 172.22.0.12
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ===========================================================
+  # WAREHOUSE DATABASE — Star Schema Data Warehouse
+  # ===========================================================
+  warehouse-db:
+    image: postgres:15
+    container_name: eds_warehouse_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WAREHOUSE_DB}
+      POSTGRES_USER: ${WAREHOUSE_USER}
+      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD}
+      PGDATA: /var/lib/postgresql/data
+    env_file:
+      - .env
+    volumes:
+      - warehouse_data:/var/lib/postgresql/data
+      - ./warehouse-db/warehouse_init.sql:/docker-entrypoint-initdb.d/01-warehouse-init.sql:ro
+      - ./warehouse-db/create-metabase-db.sql:/docker-entrypoint-initdb.d/02-metabase-db.sql:ro
+    ports:
+      - "5435:5432"
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.20
+      analytics-network:
+        ipv4_address: 172.21.0.20
+      monitoring-network:
+        ipv4_address: 172.22.0.20
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WAREHOUSE_USER} -d ${WAREHOUSE_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ===========================================================
+  # ETL PIPELINE — Scheduled Data Extraction, Transform, Load
+  # ===========================================================
+  etl:
+    build:
+      context: ./etl
+      dockerfile: Dockerfile
+    container_name: eds_etl_pipeline
+    restart: unless-stopped
+    environment:
+      # Source (primary)
+      SRC_HOST: postgres-primary
+      SRC_PORT: 5432
+      SRC_DB: ${POSTGRES_DB}
+      SRC_USER: ${POSTGRES_USER}
+      SRC_PASSWORD: ${POSTGRES_PASSWORD}
+      # Destination (warehouse)
+      DST_HOST: warehouse-db
+      DST_PORT: 5432
+      DST_DB: ${WAREHOUSE_DB}
+      DST_USER: ${WAREHOUSE_USER}
+      DST_PASSWORD: ${WAREHOUSE_PASSWORD}
+      ETL_SCHEDULE: "*/15 * * * *"   # every 15 minutes
+    env_file:
+      - .env
+    volumes:
+      - ./etl/etl_script.sql:/app/etl_script.sql:ro
+      - ./etl/etl_runner.sh:/app/etl_runner.sh:ro
+      - ./backups:/backups
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.30
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      warehouse-db:
+        condition: service_healthy
+
+  # ===========================================================
+  # METABASE — OLAP Dashboards & Reporting
+  # ===========================================================
+  metabase:
+    image: metabase/metabase:latest
+    container_name: eds_metabase
+    restart: unless-stopped
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: warehouse-db
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: metabase_db
+      MB_DB_USER: ${WAREHOUSE_USER}
+      MB_DB_PASS: ${WAREHOUSE_PASSWORD}
+      JAVA_TIMEZONE: Africa/Nairobi
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+    networks:
+      analytics-network:
+        ipv4_address: 172.21.0.40
+    depends_on:
+      warehouse-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ===========================================================
+  # PGADMIN — Database Administration & Monitoring (Bonus)
+  # ===========================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eds_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@enterprise.com
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "True"
+    env_file:
+      - .env
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./scripts/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    networks:
+      monitoring-network:
+        ipv4_address: 172.22.0.50
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+      warehouse-db:
+        condition: service_healthy
+
+  # ===========================================================
+  # PGBOUNCER — Connection Pooler for Primary (Bonus)
+  # ===========================================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: eds_pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres-primary:5432/${POSTGRES_DB}"
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 200
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 10
+    env_file:
+      - .env
+    ports:
+      - "6433:5432"
+    networks:
+      backend-network:
+        ipv4_address: 172.20.0.40
+      monitoring-network:
+        ipv4_address: 172.22.0.40
+    depends_on:
+      postgres-primary:
+        condition: service_healthy

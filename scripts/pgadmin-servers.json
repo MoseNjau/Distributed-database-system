@@ -1,0 +1,54 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Primary OLTP (Write Master)",
+      "Group": "Enterprise Data Platform",
+      "Host": "postgres-primary",
+      "Port": 5432,
+      "MaintenanceDB": "loans_db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "PostgreSQL 15 Primary — OLTP Write Master"
+    },
+    "2": {
+      "Name": "Replica 1 (Read-Only)",
+      "Group": "Enterprise Data Platform",
+      "Host": "postgres-replica-1",
+      "Port": 5432,
+      "MaintenanceDB": "loans_db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "PostgreSQL 15 Streaming Replica 1 — Read-Only"
+    },
+    "3": {
+      "Name": "Replica 2 (Read-Only)",
+      "Group": "Enterprise Data Platform",
+      "Host": "postgres-replica-2",
+      "Port": 5432,
+      "MaintenanceDB": "loans_db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "PostgreSQL 15 Streaming Replica 2 — Read-Only"
+    },
+    "4": {
+      "Name": "Data Warehouse",
+      "Group": "Enterprise Data Platform",
+      "Host": "warehouse-db",
+      "Port": 5432,
+      "MaintenanceDB": "warehouse_db",
+      "Username": "warehouse_user",
+      "SSLMode": "prefer",
+      "Comment": "PostgreSQL 15 Warehouse — Star Schema"
+    },
+    "5": {
+      "Name": "Primary via PgBouncer",
+      "Group": "Enterprise Data Platform",
+      "Host": "pgbouncer",
+      "Port": 5432,
+      "MaintenanceDB": "loans_db",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Connection pool via PgBouncer"
+    }
+  }
+}
