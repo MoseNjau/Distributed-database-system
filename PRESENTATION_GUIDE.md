@@ -839,7 +839,7 @@ Use this to demonstrate the system step by step.
 cd /home/moses/Documents/DistributedDB/enterprise-data-system
 docker compose --env-file .env ps
 ```
-**Say:** *"All 9 services are running. You can see the primary DB on port 5440, two replicas on 5441 and 5442, the warehouse on 5435, Metabase on 3000, and pgAdmin on 5050."*
+*"All 9 services are running. You can see the primary DB on port 5440, two replicas on 5441 and 5442, the warehouse on 5435, Metabase on 3000, and pgAdmin on 5050."*
 
 ---
 
@@ -851,7 +851,7 @@ docker exec eds_postgres_primary psql -U postgres -d loans_db -c \
 docker exec eds_postgres_primary psql -U postgres -d loans_db -c \
   "SELECT loan_id, customer_id, amount, interest_rate, status FROM operational.loans ORDER BY loan_id LIMIT 5;"
 ```
-**Say:** *"This is our operational OLTP database — a Loan Management System with customers, loans, and payments. Each payment records the principal portion, interest portion, and how it was paid, for example via M-Pesa or bank transfer."*
+*"This is our operational OLTP database — a Loan Management System with customers, loans, and payments. Each payment records the principal portion, interest portion, and how it was paid, for example via M-Pesa or bank transfer."*
 
 ---
 
@@ -869,7 +869,7 @@ docker exec eds_postgres_replica1 psql -U postgres -d loans_db -c \
 docker exec eds_postgres_replica1 psql -U postgres -d loans_db -c \
   "SELECT COUNT(*) AS total_customers FROM operational.customers;"
 ```
-**Say:** *"The primary currently has two replicas streaming from it in real time. The LSN values — Log Sequence Numbers — are identical, meaning zero replication lag. Replicas have the same data as the primary."*
+*"The primary currently has two replicas streaming from it in real time. The LSN values — Log Sequence Numbers — are identical, meaning zero replication lag. Replicas have the same data as the primary."*
 
 ---
 
@@ -882,7 +882,7 @@ docker exec eds_postgres_replica1 psql -U postgres -d loans_db -c \
 ```
 ERROR:  cannot execute INSERT in a read-only transaction
 ```
-**Say:** *"PostgreSQL enforces that replicas are read-only at the engine level. No application mistake can write to a replica."*
+*"PostgreSQL enforces that replicas are read-only at the engine level. No application mistake can write to a replica."*
 
 ---
 
@@ -895,7 +895,7 @@ docker exec eds_warehouse_db psql -U warehouse_user -d warehouse_db -c \
    UNION ALL SELECT 'fact_loans',   COUNT(*) FROM warehouse.fact_loans
    UNION ALL SELECT 'dim_date',     COUNT(*) FROM warehouse.dim_date;"
 ```
-**Say:** *"The data warehouse uses a star schema. We have 15 customers and 15 loans in the dimension tables, 50 payment facts, and the dim_date table is pre-populated with over 12,000 dates from 2018 to 2050."*
+*"The data warehouse uses a star schema. We have 15 customers and 15 loans in the dimension tables, 50 payment facts, and the dim_date table is pre-populated with over 12,000 dates from 2018 to 2050."*
 
 ---
 
@@ -909,7 +909,7 @@ docker exec eds_warehouse_db psql -U warehouse_user -d warehouse_db -c \
 docker exec eds_warehouse_db psql -U warehouse_user -d warehouse_db -c \
   "SELECT full_name, segment, total_paid FROM warehouse.vw_top_customers LIMIT 5;"
 ```
-**Say:** *"These pre-built analytical views answer business questions that would be too slow to run on the operational database. For example, vw_monthly_revenue aggregates payment data by month — this is the kind of query that powers a Metabase dashboard."*
+*"These pre-built analytical views answer business questions that would be too slow to run on the operational database. For example, vw_monthly_revenue aggregates payment data by month — this is the kind of query that powers a Metabase dashboard."*
 
 ---
 
@@ -925,7 +925,7 @@ docker exec eds_warehouse_db psql -U warehouse_user -d warehouse_db -c \
 ### Step 8: Show Metabase (open browser)
 Open: `http://localhost:3000`
 
-**Say:** *"Metabase is our OLAP tool. It connects directly to the warehouse database and allows business analysts to create dashboards without writing SQL. It stores its own configuration in the metabase_db database on the same warehouse server."*
+*"Metabase is our OLAP tool. It connects directly to the warehouse database and allows business analysts to create dashboards without writing SQL. It stores its own configuration in the metabase_db database on the same warehouse server."*
 
 ---
 
@@ -963,7 +963,7 @@ COMMIT;
 bash backups/backup.sh backup operational
 ls -lh backups/*.sql.gz
 ```
-**Say:** *"We can take a logical backup using pg_dump, which produces a compressed SQL file that can restore the entire database schema and data. We also have WAL archiving enabled for Point-In-Time Recovery."*
+*"We can take a logical backup using pg_dump, which produces a compressed SQL file that can restore the entire database schema and data. We also have WAL archiving enabled for Point-In-Time Recovery."*
 
 ---
 
