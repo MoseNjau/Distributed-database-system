@@ -958,6 +958,17 @@ COMMIT;
 
 ---
 
+### Step 9.1: Automated Concurrency Queue visualization (Graph)
+
+**Run this in any terminal:**
+```bash
+python3 scripts/demo_locks.py
+```
+
+**Say:** *"To show how the database handles extreme concurrency, I've written a script that spawns 20 parallel transactions. They all hit the database simultaneously to update the same row. As we can see from the terminal graph, rather than failing or corrupting the balance, PostgreSQL beautifully queues them up using row-level locks. The first one finishes quickly, while the 20th one safely waits its turn."*
+
+---
+
 ### Step 10: Demonstrate backup
 ```bash
 bash backups/backup.sh backup operational

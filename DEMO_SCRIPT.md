@@ -272,7 +272,7 @@ SELECT * FROM operational.loans WHERE loan_id = 1 FOR UPDATE;
 -- THIS HANGS — Terminal 2 is blocked waiting for Terminal 1
 ```
 
-**Show the lecturer that Terminal 2 is frozen/waiting.**
+**Show the that Terminal 2 is frozen/waiting.**
 
 **Terminal 1:**
 ```sql
@@ -282,6 +282,22 @@ COMMIT;
 
 **Say:**
 > "FOR UPDATE acquires an exclusive row-level lock. Terminal 2 is completely blocked — it cannot proceed until Terminal 1 releases the lock. This is how a banking system ensures that when two payment requests arrive for the same loan simultaneously, they are processed one at a time — never overlapping and never corrupting the balance."
+
+---
+
+### Demo D: Automated Lock Queueing (Concurrency Graph)
+
+**Run this Python script to show exactly how locks queue multiple operations:**
+
+```bash
+python3 scripts/demo_locks.py
+```
+
+**What you will see:**
+The script spawns 20 parallel transactions that all attempt to lock and update the exact same loan row. Because of row-level locking, PostgreSQL refuses to run them simultaneously. Instead, it forces them into a queue, satisfying them one by one. You will see a beautiful terminal bar graph where Transaction 1 completes in ~0.5s, while Transaction 20 has to wait ~10s in the queue for the lock to be released!
+
+**Say:**
+> "To really visualise this, I have a script that fires 20 simultaneous transactions at the exact same row. As you can see from this real-time graph, PostgreSQL's row-locking system queues them up flawlessly. None of them fail, and none of them overlap and corrupt the data — they simply wait their turn. This proves the system is enterprise-ready and safe for high-concurrency environments."
 
 ---
 
